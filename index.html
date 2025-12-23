@@ -2,196 +2,323 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Pixel F1 Racing HTML - Corrigido</title>
+    <title>Arcade Racing DX</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
-            background: #222;
+            background-color: #111;
+            background-image: radial-gradient(circle, #222 0%, #000 90%);
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             color: white;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Press Start 2P', cursive; /* Fonte Arcade */
             overflow: hidden;
         }
+
+        /* Moldura do jogo */
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.2);
+            border: 4px solid #444;
+            border-radius: 4px;
+        }
+
         canvas {
-            background: #444;
-            border-left: 15px solid #1a3c1a;
-            border-right: 15px solid #1a3c1a;
-            background-image: linear-gradient(rgba(0, 0, 0, 0.1) 50%, transparent 50%);
-            background-size: 100% 4px;
-            box-shadow: 0 0 30px black;
+            background: #333;
+            display: block;
             image-rendering: pixelated; 
         }
-        #uiContainer {
+
+        /* Interface do Usuário (UI) */
+        .hud {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            left: 10px;
+            top: 10px;
+            text-shadow: 2px 2px 0 #000;
             pointer-events: none;
+            line-height: 1.5;
+            font-size: 12px;
         }
-        #gameOver {
+
+        #highScoreText { color: #ffff00; }
+
+        /* Tela de Game Over */
+        #gameOverScreen {
             position: absolute;
-            display: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             text-align: center;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 30px;
-            border: 4px solid red;
+            display: none;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            border: 2px solid white;
+            box-shadow: 5px 5px 0 #ff0000;
             z-index: 10;
+            min-width: 200px;
         }
-        h1 { margin: 0; color: red; font-size: 40px;}
-        h2 { margin: 10px 0; }
+
+        h1 { font-size: 20px; color: #ff4444; margin-bottom: 20px; }
+        p { font-size: 10px; color: #ccc; margin-bottom: 20px; }
+        
+        button {
+            background: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+
     </style>
 </head>
 <body>
 
-    <div id="uiContainer">
-        <h2>Score: <span id="scoreDisplay">0</span></h2>
-        <p>Speed: <span id="speedDisplay">1x</span></p>
-    </div>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        
+        <div class="hud">
+            <div>SCORE: <span id="scoreVal">0</span></div>
+            <div id="highScoreText">HI: <span id="highScoreVal">0</span></div>
+            <div style="margin-top:5px; color:#00ccff">SPD: <span id="speedVal">100</span>%</div>
+        </div>
 
-    <div id="gameOver">
-        <h1>CRASH!</h1>
-        <p>Fim da linha, piloto.</p>
-        <p>Pressione <strong>F5</strong> para correr de novo.</p>
+        <div id="gameOverScreen">
+            <h1>CRASHED!</h1>
+            <p>SCORE: <span id="finalScore">0</span></p>
+            <button onclick="resetGame()">TRY AGAIN</button>
+        </div>
     </div>
-
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false; 
+        ctx.imageSmoothingEnabled = false;
 
-        const gameOverScreen = document.getElementById('gameOver');
-        const scoreDisplay = document.getElementById('scoreDisplay');
-        const speedDisplay = document.getElementById('speedDisplay');
+        // Elementos da DOM
+        const uiScore = document.getElementById('scoreVal');
+        const uiHigh = document.getElementById('highScoreVal');
+        const uiSpeed = document.getElementById('speedVal');
+        const uiFinalScore = document.getElementById('finalScore');
+        const screenGameOver = document.getElementById('gameOverScreen');
 
-        // --- PREPARAÇÃO DO JOGO ---
-        let gameRunning = true;
-        let score = 0;
-        let baseSpeed = 4;
-        let currentSpeed = baseSpeed;
-        let roadOffset = 0;
-
-        const player = { x: 175, y: 500, width: 50, height: 80, dx: 7 };
-        const keys = { ArrowLeft: false, ArrowRight: false };
-        let obstacles = [];
-
-        // Imagens
-        const playerImg = new Image();
-        const enemyImg = new Image();
-
-        // CONTROLES
-        document.addEventListener('keydown', (e) => { if(e.key in keys) keys[e.key] = true; });
-        document.addEventListener('keyup', (e) => { if(e.key in keys) keys[e.key] = false; });
-
-        // FUNÇÕES
-        function spawnObstacle() {
-            if (!gameRunning) return;
-            const width = 50;
-            const x = Math.random() * (canvas.width - width);
-            obstacles.push({ x: x, y: -150, width: width, height: 80 });
-            
-            let spawnRate = 1500 / (currentSpeed / baseSpeed); 
-            setTimeout(spawnObstacle, spawnRate + Math.random() * 500);
-        }
-
-        function checkCollision(rect1, rect2) {
-            const marginX = 5;
-            const marginY = 5;
-            return (
-                rect1.x + marginX < rect2.x + rect2.width - marginX &&
-                rect1.x + rect1.width - marginX > rect2.x + marginX &&
-                rect1.y + marginY < rect2.y + rect2.height - marginY &&
-                rect1.y + rect1.height - marginY > rect2.y + marginY
-            );
-        }
-
-        function update() {
-            if (!gameRunning) return;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Pista
-            roadOffset += currentSpeed;
-            if (roadOffset > 80) roadOffset = 0;
-
-            ctx.fillStyle = "rgba(255,255,255,0.8)";
-            for(let i = -1; i < 10; i++) {
-                let y = (i * 80) + roadOffset; 
-                ctx.fillRect(195, y, 10, 40); 
-                ctx.fillRect(10, y, 5, 40);
-                ctx.fillRect(385, y, 5, 40);
-            }
-
-            // Jogador
-            if (keys.ArrowLeft && player.x > 5) player.x -= player.dx;
-            if (keys.ArrowRight && player.x < canvas.width - player.width - 5) player.x += player.dx;
-            
-            // Se a imagem não tiver carregado ainda, desenha quadrado azul (fallback)
-            if (playerImg.complete) {
-                ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-            } else {
-                ctx.fillStyle = "blue";
-                ctx.fillRect(player.x, player.y, player.width, player.height);
-            }
-
-            // Obstáculos
-            for (let i = 0; i < obstacles.length; i++) {
-                let obs = obstacles[i];
-                obs.y += currentSpeed;
-
-                if (enemyImg.complete) {
-                    ctx.drawImage(enemyImg, obs.x, obs.y, obs.width, obs.height);
-                } else {
-                    ctx.fillStyle = "red";
-                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                }
-                
-                // Filtro vermelho
-                ctx.fillStyle = "rgba(200, 0, 0, 0.6)";
-                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-
-                if (checkCollision(player, obs)) {
-                    gameRunning = false;
-                    gameOverScreen.style.display = 'block';
-                }
-            }
-
-            // Pontuação
-            if (obstacles.length > 0 && obstacles[0].y > canvas.height) {
-                obstacles.shift();
-                score++;
-                scoreDisplay.innerText = score;
-                currentSpeed = currentSpeed * 1.02;
-                if (currentSpeed > 22) currentSpeed = 22;
-                speedDisplay.innerText = (currentSpeed / baseSpeed).toFixed(1) + "x";
-            }
-
-            requestAnimationFrame(update);
-        }
-
-        // --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
-        // 1. Definimos o que fazer quando carregar
-        playerImg.onload = () => {
-             // Só inicia se ainda não tiver iniciado
-             if(gameRunning && obstacles.length === 0) {
-                 spawnObstacle();
-                 update();
-             }
+        // --- SISTEMA DE IMAGENS (Safe Loading) ---
+        const sprites = { player: null, enemy: null };
+        const playerSrc = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
+        
+        // --- VARIÁVEIS DE ESTADO ---
+        let state = {
+            running: false,
+            score: 0,
+            highScore: localStorage.getItem('racing-highscore') || 0,
+            speed: 5,
+            roadOffset: 0
         };
 
-        // 2. DEPOIS definimos a fonte da imagem
-        playerImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
-        enemyImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
+        // --- FÍSICA DO JOGADOR (Melhoria de Jogabilidade) ---
+        const player = {
+            x: 175, y: 500, width: 50, height: 80,
+            velocityX: 0,
+            acceleration: 0.8, // Quanto ele acelera
+            friction: 0.92,    // Quanto ele "escorrega" ao soltar a tecla
+            maxSpeed: 8
+        };
 
-        // 3. Fallback de segurança: Se por acaso já estiver carregado (cache), força o início
-        setTimeout(() => {
-            if (playerImg.complete && obstacles.length === 0) {
-                spawnObstacle();
-                update();
+        const keys = { ArrowLeft: false, ArrowRight: false, a: false, d: false };
+        let obstacles = [];
+        let particles = []; // Array para as explosões
+
+        // --- SISTEMA DE PARTÍCULAS (Melhoria Visual) ---
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.size = Math.random() * 4 + 2;
+                this.speedX = Math.random() * 6 - 3;
+                this.speedY = Math.random() * 6 - 3;
+                this.life = 1.0; // Opacidade
             }
-        }, 100);
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life -= 0.02; // Desaparece aos poucos
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        // --- CONTROLES ---
+        window.addEventListener('keydown', e => keys[e.key] = true);
+        window.addEventListener('keyup', e => keys[e.key] = false);
+
+        function init() {
+            uiHigh.innerText = state.highScore;
+            // Carrega imagens
+            let pImg = new Image();
+            let eImg = new Image();
+            let loaded = 0;
+            const onAudioLoad = () => {
+                loaded++;
+                if(loaded === 2) startGame();
+            };
+            pImg.onload = onAudioLoad;
+            eImg.onload = onAudioLoad;
+            pImg.src = playerSrc;
+            eImg.src = playerSrc; // Usando a mesma imagem pro inimigo por simplicidade
+            sprites.player = pImg;
+            sprites.enemy = eImg;
+            
+            // Fallback se já estiver em cache
+            setTimeout(() => { if(!state.running) startGame(); }, 500);
+        }
+
+        function startGame() {
+            if(state.running) return;
+            state.running = true;
+            state.score = 0;
+            state.speed = 5;
+            player.x = 175;
+            player.velocityX = 0;
+            obstacles = [];
+            particles = [];
+            screenGameOver.style.display = 'none';
+            spawnObstacle();
+            gameLoop();
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+        function spawnObstacle() {
+            if (!state.running) return;
+            const x = Math.random() * (canvas.width - 50);
+            obstacles.push({ x: x, y: -100, width: 50, height: 80, passed: false });
+            
+            // Fórmula para deixar o jogo progressivamente mais difícil
+            let nextSpawn = 1200 / (state.speed / 4);
+            setTimeout(spawnObstacle, nextSpawn);
+        }
+
+        function createExplosion(x, y) {
+            for(let i=0; i<30; i++) {
+                particles.push(new Particle(x + 25, y + 40, i%2==0 ? '#ff4444' : '#ffff00'));
+            }
+        }
+
+        function gameLoop() {
+            if (!state.running && particles.length === 0) return; // Para se não houver mais nada animando
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. DESENHA ESTRADA (Fundo)
+            ctx.fillStyle = "#444";
+            ctx.fillRect(0,0, canvas.width, canvas.height);
+            
+            // Grama Lateral
+            ctx.fillStyle = "#2a5d2a";
+            ctx.fillRect(0, 0, 20, canvas.height);
+            ctx.fillRect(380, 0, 20, canvas.height);
+
+            // Faixas (Efeito Parallax Simples)
+            if(state.running) state.roadOffset += state.speed;
+            if(state.roadOffset > 80) state.roadOffset = 0;
+
+            ctx.fillStyle = "rgba(255,255,255,0.3)";
+            for(let i=-1; i<10; i++) {
+                ctx.fillRect(190, (i*80) + state.roadOffset, 20, 40);
+            }
+
+            // 2. FÍSICA DO JOGADOR (Inércia)
+            // Aceleração
+            if (keys.ArrowLeft || keys.a) player.velocityX -= player.acceleration;
+            if (keys.ArrowRight || keys.d) player.velocityX += player.acceleration;
+            
+            // Atrito (Carro para devagar quando solta botão)
+            player.velocityX *= player.friction;
+            
+            // Atualiza Posição
+            player.x += player.velocityX;
+
+            // Limites da Tela (Bater na parede para a velocidade)
+            if (player.x < 20) { player.x = 20; player.velocityX = 0; }
+            if (player.x > canvas.width - 70) { player.x = canvas.width - 70; player.velocityX = 0; }
+
+            // Desenha Jogador (Tremidinha se estiver muito rápido)
+            let shake = (state.speed > 15) ? (Math.random()*2 - 1) : 0;
+            if(state.running) ctx.drawImage(sprites.player, player.x + shake, player.y, player.width, player.height);
+
+            // 3. OBSTÁCULOS
+            for (let i = 0; i < obstacles.length; i++) {
+                let obs = obstacles[i];
+                if(state.running) obs.y += state.speed;
+
+                // Desenha Inimigo (Com filtro vermelho)
+                ctx.drawImage(sprites.enemy, obs.x, obs.y, obs.width, obs.height);
+                ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+                // Colisão
+                if (state.running && 
+                    player.x < obs.x + obs.width - 10 &&
+                    player.x + player.width > obs.x + 10 &&
+                    player.y < obs.y + obs.height - 10 &&
+                    player.y + player.height > obs.y + 10) {
+                    
+                    gameOver();
+                }
+
+                // Pontuação
+                if (obs.y > canvas.height && !obs.passed) {
+                    obs.passed = true;
+                    state.score++;
+                    state.speed += 0.2; // Aumenta velocidade linearmente
+                    uiScore.innerText = state.score;
+                    uiSpeed.innerText = Math.floor((state.speed/5)*100);
+                }
+            }
+
+            // 4. PARTICULAS (Explosão)
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.update();
+                p.draw(ctx);
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            state.running = false;
+            createExplosion(player.x, player.y);
+            
+            // High Score Logic
+            if(state.score > state.highScore) {
+                state.highScore = state.score;
+                localStorage.setItem('racing-highscore', state.highScore);
+                uiHigh.innerText = state.highScore;
+            }
+
+            uiFinalScore.innerText = state.score;
+            // Delay para aparecer a tela de game over
+            setTimeout(() => {
+                screenGameOver.style.display = 'block';
+            }, 500);
+        }
+
+        // Inicia
+        init();
 
     </script>
 </body>
