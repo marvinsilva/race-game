@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mini Racing HTML</title>
+    <style>
+        body {
+            margin: 0;
+            background: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden; /* Evita barras de rolagem */
+        }
+        canvas {
+            background: #555; /* Cor da estrada */
+            border-left: 10px solid green; /* Grama esquerda */
+            border-right: 10px solid green; /* Grama direita */
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        #gameOver {
+            position: absolute;
+            display: none;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gameOver">
+        <h1>Bateu!</h1>
+        <p>Pressione F5 para reiniciar</p>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverScreen = document.getElementById('gameOver');
+
+        // Variáveis do Jogo
+        let gameRunning = true;
+        let score = 0;
+        
+        // O Jogador (Carro Azul)
+        const player = {
+            x: 175,
+            y: 500,
+            width: 50,
+            height: 80,
+            speed: 5,
+            color: '#00ccff'
+        };
+
+        // Controles
+        const keys = { ArrowLeft: false, ArrowRight: false };
+
+        document.addEventListener('keydown', (e) => {
+            if(e.key in keys) keys[e.key] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if(e.key in keys) keys[e.key] = false;
+        });
+
+        // Obstáculos (Carros Vermelhos)
+        const obstacles = [];
+        const obstacleSpeed = 4;
+
+        // Função para criar obstáculos
+        function spawnObstacle() {
+            if (!gameRunning) return;
+            const width = 50;
+            // Posição aleatória na largura da pista
+            const x = Math.random() * (canvas.width - width);
+            obstacles.push({ x: x, y: -100, width: width, height: 80, color: '#ff4444' });
+            
+            // Gera um novo obstáculo em tempo aleatório entre 1 e 2 segundos
+            setTimeout(spawnObstacle, 1000 + Math.random() * 1000);
+        }
+
+        // Detectar Colisão (Lógica simples de retângulo sobreposto)
+        function checkCollision(rect1, rect2) {
+            return (
+                rect1.x < rect2.x + rect2.width &&
+                rect1.x + rect1.width > rect2.x &&
+                rect1.y < rect2.y + rect2.height &&
+                rect1.y + rect1.height > rect2.y
+            );
+        }
+
+        // Loop Principal do Jogo (Desenha e Atualiza tudo)
+        function update() {
+            if (!gameRunning) return;
+
+            // Limpa a tela
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Desenha Faixas da Pista (efeito de movimento)
+            ctx.fillStyle = "white";
+            for(let i = 0; i < 20; i++) {
+                // Move as faixas baseado no tempo para simular velocidade
+                let y = (i * 60 + Date.now() / 2) % 650 - 50; 
+                ctx.fillRect(195, y, 10, 40);
+            }
+
+            // Movimento do Jogador
+            if (keys.ArrowLeft && player.x > 0) player.x -= player.speed;
+            if (keys.ArrowRight && player.x < canvas.width - player.width) player.x += player.speed;
+
+            // Desenha Jogador
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Atualiza e Desenha Obstáculos
+            for (let i = 0; i < obstacles.length; i++) {
+                let obs = obstacles[i];
+                obs.y += obstacleSpeed;
+                ctx.fillStyle = obs.color;
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+                // Checa batida
+                if (checkCollision(player, obs)) {
+                    gameRunning = false;
+                    gameOverScreen.style.display = 'block';
+                }
+            }
+
+            // Remove obstáculos que já passaram da tela (para não pesar a memória)
+            if (obstacles.length > 0 && obstacles[0].y > canvas.height) {
+                obstacles.shift();
+                score++;
+            }
+
+            // Desenha Pontuação
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText("Score: " + score, 10, 30);
+
+            requestAnimationFrame(update);
+        }
+
+        // Inicia o jogo
+        spawnObstacle();
+        update();
+
+    </script>
+</body>
+</html>
