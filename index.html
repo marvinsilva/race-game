@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Arcade Racing - Pixel Art Edition</title>
+    <title>Arcade Racing - Final Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
@@ -26,7 +26,6 @@
         canvas {
             background: #333;
             display: block;
-            /* Garante que os pixels fiquem quadradinhos perfeitos */
             image-rendering: pixelated; 
         }
 
@@ -54,6 +53,18 @@
             border: 4px solid #ff4444;
             z-index: 10;
             box-shadow: 0 0 20px red;
+            width: 80%; /* Garante que caiba em telas menores */
+        }
+
+        /* Animaçãozinha no texto de press space */
+        .blink {
+            animation: blinker 1s linear infinite;
+            color: #ccc;
+            font-size: 10px;
+            margin-top: 15px;
+        }
+        @keyframes blinker {
+            50% { opacity: 0; }
         }
 
         button {
@@ -85,6 +96,7 @@
             <h1 style="color:red; margin:0 0 20px 0; font-size: 25px;">CRASH!</h1>
             <p>FINAL SCORE: <span id="finalScore" style="color:yellow">0</span></p>
             <button onclick="resetGame()">TENTAR DE NOVO</button>
+            <p class="blink">[ ESPAÇO para Reiniciar ]</p>
         </div>
     </div>
 
@@ -108,11 +120,19 @@
         let obstacles = [];
         const keys = { ArrowLeft: false, ArrowRight: false };
 
-        // --- CONTROLES ---
+        // --- CONTROLES (Atualizado para BARRA DE ESPAÇO) ---
         window.addEventListener('keydown', e => { 
             if(e.key === "ArrowLeft") keys.ArrowLeft = true; 
             if(e.key === "ArrowRight") keys.ArrowRight = true; 
+            
+            // Lógica nova: Reiniciar com Espaço
+            if(e.code === "Space") {
+                if(!gameRunning) {
+                    resetGame();
+                }
+            }
         });
+
         window.addEventListener('keyup', e => { 
             if(e.key === "ArrowLeft") keys.ArrowLeft = false; 
             if(e.key === "ArrowRight") keys.ArrowRight = false; 
@@ -120,44 +140,34 @@
 
         document.getElementById('highVal').innerText = highScore;
 
-        // --- DESENHAR CARRO "NA MÃO" (Pixel Art via Código) ---
-        // Esta função desenha o carro usando retângulos, sem precisar de imagens externas
+        // --- FUNÇÃO DE DESENHO (Pixel Art via Código) ---
         function desenharCarro(x, y, corPrincipal) {
-            
-            // 1. Pneus (Pretos)
+            // 1. Pneus
             ctx.fillStyle = "#111";
-            // Pneu Esq Frente | Pneu Dir Frente
             ctx.fillRect(x, y + 10, 12, 18); 
             ctx.fillRect(x + 38, y + 10, 12, 18);
-            // Pneu Esq Trás | Pneu Dir Trás
             ctx.fillRect(x, y + 52, 12, 18); 
             ctx.fillRect(x + 38, y + 52, 12, 18);
 
-            // 2. Chassi Principal (Cor do Carro)
+            // 2. Chassi
             ctx.fillStyle = corPrincipal;
-            // Bico
-            ctx.fillRect(x + 18, y + 5, 14, 75);
-            // Asa Traseira
-            ctx.fillRect(x + 8, y + 65, 34, 10);
-            // Asa Dianteira
-            ctx.fillRect(x + 8, y + 5, 34, 6);
-            // Laterais (Sidepods)
-            ctx.fillRect(x + 10, y + 30, 8, 30);
-            ctx.fillRect(x + 32, y + 30, 8, 30);
+            ctx.fillRect(x + 18, y + 5, 14, 75); // Centro
+            ctx.fillRect(x + 8, y + 65, 34, 10); // Asa Tras
+            ctx.fillRect(x + 8, y + 5, 34, 6);   // Asa Diant
+            ctx.fillRect(x + 10, y + 30, 8, 30); // Lateral Esq
+            ctx.fillRect(x + 32, y + 30, 8, 30); // Lateral Dir
 
-            // 3. Capacete do Piloto (Amarelo)
+            // 3. Capacete
             ctx.fillStyle = "#ffff00";
             ctx.fillRect(x + 22, y + 40, 6, 6);
         }
 
         // --- SISTEMA DE JOGO ---
-
         function spawnObstacle() {
             if(!gameRunning) return;
             const x = Math.random() * (canvas.width - 50);
             obstacles.push({ x: x, y: -100, width: 50, height: 80, passed: false });
             
-            // Fica mais rápido spawnar conforme o jogo avança
             let frequency = 1200 - (speed * 15);
             if (frequency < 500) frequency = 500;
             
@@ -169,30 +179,27 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. DESENHA ESTRADA
+            // 1. ESTRADA
             roadOffset += speed;
             if(roadOffset > 80) roadOffset = 0;
             
-            // Asfalto
             ctx.fillStyle = "#333"; 
             ctx.fillRect(0,0, canvas.width, canvas.height);
             
-            // Grama e Zebras
+            // Grama
             ctx.fillStyle = "#1a551a"; 
             ctx.fillRect(0,0, 20, canvas.height);
             ctx.fillRect(380,0, 20, canvas.height);
             
-            // Zebra Vermelha/Branca animada nas laterais
+            // Zebras Animadas
             let zebraColor = (Math.floor(Date.now() / 100) % 2 === 0) ? "#fff" : "#ff0000";
             ctx.fillStyle = zebraColor;
             for(let i=-1; i<12; i++) {
-                 // Faixa Esquerda
                  ctx.fillRect(15, (i*60) + roadOffset, 5, 30);
-                 // Faixa Direita
                  ctx.fillRect(380, (i*60) + roadOffset, 5, 30);
             }
 
-            // Faixas brancas do meio
+            // Faixas Centrais
             ctx.fillStyle = "rgba(255,255,255,0.3)";
             for(let i=-1; i<10; i++) {
                 ctx.fillRect(195, (i*80) + roadOffset, 10, 40);
@@ -204,22 +211,20 @@
             player.vx *= player.friction;
             player.x += player.vx;
 
-            // Limites da parede
             if(player.x < 20) { player.x = 20; player.vx = 0; }
             if(player.x > 330) { player.x = 330; player.vx = 0; }
 
-            // DESENHA JOGADOR (Chama a função nova)
-            desenharCarro(player.x, player.y, "#00ccff"); // Azul Ciano
+            // DESENHA JOGADOR
+            desenharCarro(player.x, player.y, "#00ccff");
 
             // 3. OBSTÁCULOS
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
                 obs.y += speed;
 
-                // DESENHA INIMIGO
-                desenharCarro(obs.x, obs.y, "#ff4444"); // Vermelho
+                desenharCarro(obs.x, obs.y, "#ff4444");
 
-                // Colisão (Hitbox um pouco menor que o carro para ser justo)
+                // Colisão
                 if (
                     player.x + 5 < obs.x + obs.width - 5 &&
                     player.x + player.width - 5 > obs.x + 5 &&
@@ -233,7 +238,7 @@
                 if(obs.y > canvas.height && !obs.passed) {
                     obs.passed = true;
                     score++;
-                    speed += 0.2; 
+                    speed += 0.4; 
                     document.getElementById('scoreVal').innerText = score;
                     document.getElementById('speedVal').innerText = Math.floor((speed/5)*100);
                 }
