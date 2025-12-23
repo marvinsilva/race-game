@@ -2,35 +2,33 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Pixel F1 Racing HTML</title>
+    <title>Pixel F1 Racing HTML - Corrigido</title>
     <style>
         body {
             margin: 0;
-            background: #222; /* Fundo mais escuro */
+            background: #222;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             color: white;
-            font-family: 'Courier New', Courier, monospace; /* Fonte mais "retro" */
+            font-family: 'Courier New', Courier, monospace;
             overflow: hidden;
         }
         canvas {
             background: #444;
-            border-left: 15px solid #1a3c1a; /* Grama pixelada escura */
+            border-left: 15px solid #1a3c1a;
             border-right: 15px solid #1a3c1a;
-            /* Efeito de scanline retro */
             background-image: linear-gradient(rgba(0, 0, 0, 0.1) 50%, transparent 50%);
             background-size: 100% 4px;
             box-shadow: 0 0 30px black;
-            /* Importante para pixel art não ficar borrado ao escalar */
             image-rendering: pixelated; 
         }
         #uiContainer {
             position: absolute;
             top: 20px;
             left: 20px;
-            pointer-events: none; /* Clica através do texto */
+            pointer-events: none;
         }
         #gameOver {
             position: absolute;
@@ -63,56 +61,43 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        // Garante que as imagens fiquem nítidas (pixeladas)
         ctx.imageSmoothingEnabled = false; 
 
         const gameOverScreen = document.getElementById('gameOver');
         const scoreDisplay = document.getElementById('scoreDisplay');
         const speedDisplay = document.getElementById('speedDisplay');
 
-        // --- CARREGAMENTO DAS IMAGENS (Data URIs para facilitar o exemplo) ---
-        // Jogador (Azul)
-        const playerImg = new Image();
-        playerImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
-        
-        // Inimigo (Vermelho)
-        const enemyImg = new Image();
-        enemyImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
-
-        // Variação de cor para o inimigo (filtro CSS simples no canvas depois)
-        // Vamos usar um truque simples: desenhar o inimigo com um filtro vermelho por cima.
-
-        // --- VARIÁVEIS DO JOGO ---
+        // --- PREPARAÇÃO DO JOGO ---
         let gameRunning = true;
         let score = 0;
         let baseSpeed = 4;
         let currentSpeed = baseSpeed;
-        let roadOffset = 0; // Para animar a pista
+        let roadOffset = 0;
 
-        const player = {
-            x: 175, y: 500, width: 50, height: 80, dx: 7 // dx é a velocidade lateral
-        };
-
+        const player = { x: 175, y: 500, width: 50, height: 80, dx: 7 };
         const keys = { ArrowLeft: false, ArrowRight: false };
+        let obstacles = [];
+
+        // Imagens
+        const playerImg = new Image();
+        const enemyImg = new Image();
+
+        // CONTROLES
         document.addEventListener('keydown', (e) => { if(e.key in keys) keys[e.key] = true; });
         document.addEventListener('keyup', (e) => { if(e.key in keys) keys[e.key] = false; });
 
-        let obstacles = [];
-
+        // FUNÇÕES
         function spawnObstacle() {
             if (!gameRunning) return;
             const width = 50;
             const x = Math.random() * (canvas.width - width);
-            // Obstáculos começam mais acima para dar tempo de reação com velocidade alta
             obstacles.push({ x: x, y: -150, width: width, height: 80 });
             
-            // O tempo entre obstáculos diminui ligeiramente conforme a velocidade aumenta
             let spawnRate = 1500 / (currentSpeed / baseSpeed); 
             setTimeout(spawnObstacle, spawnRate + Math.random() * 500);
         }
 
         function checkCollision(rect1, rect2) {
-            // Margem de tolerância para a hitbox não ser tão punitiva (hitbox menor que a imagem)
             const marginX = 5;
             const marginY = 5;
             return (
@@ -127,38 +112,45 @@
             if (!gameRunning) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // --- DESENHA A PISTA ---
-            // A velocidade da animação da pista aumenta com a velocidade do jogo
+            // Pista
             roadOffset += currentSpeed;
-            if (roadOffset > 60) roadOffset = 0; // Reseta o loop da faixa
+            if (roadOffset > 80) roadOffset = 0;
 
             ctx.fillStyle = "rgba(255,255,255,0.8)";
             for(let i = -1; i < 10; i++) {
                 let y = (i * 80) + roadOffset; 
-                ctx.fillRect(195, y, 10, 40); // Faixa central
-                // Faixas laterais para dar mais sensação de velocidade
+                ctx.fillRect(195, y, 10, 40); 
                 ctx.fillRect(10, y, 5, 40);
                 ctx.fillRect(385, y, 5, 40);
             }
 
-            // --- JOGADOR ---
+            // Jogador
             if (keys.ArrowLeft && player.x > 5) player.x -= player.dx;
             if (keys.ArrowRight && player.x < canvas.width - player.width - 5) player.x += player.dx;
+            
+            // Se a imagem não tiver carregado ainda, desenha quadrado azul (fallback)
+            if (playerImg.complete) {
+                ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+            } else {
+                ctx.fillStyle = "blue";
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+            }
 
-            // Desenha a imagem do jogador em vez do quadrado
-            ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-
-            // --- OBSTÁCULOS ---
+            // Obstáculos
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
-                obs.y += currentSpeed; // Usando a velocidade dinâmica
+                obs.y += currentSpeed;
 
-                // Desenha o inimigo. Truque para mudar a cor da mesma imagem:
-                // Desenhamos a imagem, e depois um quadrado vermelho semitransparente por cima
-                ctx.drawImage(enemyImg, obs.x, obs.y, obs.width, obs.height);
-                ctx.fillStyle = "rgba(200, 0, 0, 0.6)"; // Vermelho transparente
-                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                if (enemyImg.complete) {
+                    ctx.drawImage(enemyImg, obs.x, obs.y, obs.width, obs.height);
+                } else {
+                    ctx.fillStyle = "red";
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                }
                 
+                // Filtro vermelho
+                ctx.fillStyle = "rgba(200, 0, 0, 0.6)";
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
 
                 if (checkCollision(player, obs)) {
                     gameRunning = false;
@@ -166,31 +158,40 @@
                 }
             }
 
-            // --- LÓGICA DE PONTUAÇÃO E VELOCIDADE ---
+            // Pontuação
             if (obstacles.length > 0 && obstacles[0].y > canvas.height) {
                 obstacles.shift();
                 score++;
                 scoreDisplay.innerText = score;
-
-                // AUMENTO EXPONENCIAL DE VELOCIDADE
-                // Multiplica a velocidade atual por 1.02 (aumento de 2%) a cada carro ultrapassado
                 currentSpeed = currentSpeed * 1.02;
-
-                // Limite máximo de velocidade para não quebrar o jogo
                 if (currentSpeed > 22) currentSpeed = 22;
-
-                // Atualiza o display de velocidade (arredondando)
                 speedDisplay.innerText = (currentSpeed / baseSpeed).toFixed(1) + "x";
             }
 
             requestAnimationFrame(update);
         }
 
-        // Espera as imagens carregarem antes de começar
+        // --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
+        // 1. Definimos o que fazer quando carregar
         playerImg.onload = () => {
-             spawnObstacle();
-             update();
-        }
+             // Só inicia se ainda não tiver iniciado
+             if(gameRunning && obstacles.length === 0) {
+                 spawnObstacle();
+                 update();
+             }
+        };
+
+        // 2. DEPOIS definimos a fonte da imagem
+        playerImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
+        enemyImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
+
+        // 3. Fallback de segurança: Se por acaso já estiver carregado (cache), força o início
+        setTimeout(() => {
+            if (playerImg.complete && obstacles.length === 0) {
+                spawnObstacle();
+                update();
+            }
+        }, 100);
 
     </script>
 </body>
