@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Arcade Racing Final</title>
+    <title>Arcade Racing - Pixel Art Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
@@ -20,12 +20,13 @@
         #gameContainer {
             position: relative;
             border: 4px solid #555;
-            box-shadow: 0 0 20px #000;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
         }
 
         canvas {
             background: #333;
             display: block;
+            /* Garante que os pixels fiquem quadradinhos perfeitos */
             image-rendering: pixelated; 
         }
 
@@ -35,9 +36,10 @@
             top: 10px;
             font-size: 10px;
             color: #fff;
-            text-shadow: 1px 1px 0 #000;
+            text-shadow: 2px 2px 0 #000;
             pointer-events: none;
             line-height: 1.8;
+            z-index: 5;
         }
 
         #gameOverScreen {
@@ -47,22 +49,25 @@
             transform: translate(-50%, -50%);
             text-align: center;
             display: none;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border: 2px solid #ff4444;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border: 4px solid #ff4444;
             z-index: 10;
+            box-shadow: 0 0 20px red;
         }
 
         button {
-            margin-top: 15px;
-            padding: 10px;
+            margin-top: 20px;
+            padding: 15px 20px;
             font-family: inherit;
             cursor: pointer;
             background: #ff4444;
             color: white;
             border: none;
+            font-size: 12px;
+            text-transform: uppercase;
         }
-        button:hover { background: #ff0000; }
+        button:hover { background: #ff0000; transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -71,27 +76,22 @@
         <canvas id="gameCanvas" width="400" height="600"></canvas>
         
         <div class="hud">
-            <div>SCORE: <span id="scoreVal">0</span></div>
+            <div style="color:yellow">SCORE: <span id="scoreVal">0</span></div>
             <div>HIGH: <span id="highVal">0</span></div>
+            <div style="color:#00ccff">SPEED: <span id="speedVal">100</span>%</div>
         </div>
 
         <div id="gameOverScreen">
-            <h1 style="color:red; margin:0 0 10px 0">CRASH!</h1>
-            <p>Score Final: <span id="finalScore">0</span></p>
-            <button onclick="resetGame()">RETRY</button>
+            <h1 style="color:red; margin:0 0 20px 0; font-size: 25px;">CRASH!</h1>
+            <p>FINAL SCORE: <span id="finalScore" style="color:yellow">0</span></p>
+            <button onclick="resetGame()">TENTAR DE NOVO</button>
         </div>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
 
-        // --- IMAGENS (Definidas Globalmente) ---
-        // Se a imagem falhar, usaremos um quadrado colorido
-        const playerSprite = new Image();
-        playerSprite.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAYCAYAAADW7y+UAAAAAXNSR0IArs4c6QAAAEVJREFUOE9jZKAQcEIxAwXgPwwD/0k1hGE0zDAeBcMIApLSWCTFcaQYQhY7sShG1k+y43GkGEayE9FwREn0I8UwYgAAa5YgE+L+k5oAAAAASUVORK5CYII=';
-        
         // --- ESTADO DO JOGO ---
         let gameRunning = true;
         let score = 0;
@@ -99,52 +99,69 @@
         let speed = 5;
         let roadOffset = 0;
 
-        // Jogador
+        // O Jogador
         const player = { 
             x: 175, y: 500, width: 50, height: 80, 
-            vx: 0, ax: 0.8, friction: 0.92 
+            vx: 0, ax: 0.9, friction: 0.90 
         };
 
-        // Obstáculos
         let obstacles = [];
-
-        // Inputs
         const keys = { ArrowLeft: false, ArrowRight: false };
 
         // --- CONTROLES ---
-        window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.code)) keys[e.code] = true; else if(e.key === "ArrowLeft") keys.ArrowLeft = true; else if(e.key === "ArrowRight") keys.ArrowRight = true; });
-        window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.code)) keys[e.code] = false; else if(e.key === "ArrowLeft") keys.ArrowLeft = false; else if(e.key === "ArrowRight") keys.ArrowRight = false; });
+        window.addEventListener('keydown', e => { 
+            if(e.key === "ArrowLeft") keys.ArrowLeft = true; 
+            if(e.key === "ArrowRight") keys.ArrowRight = true; 
+        });
+        window.addEventListener('keyup', e => { 
+            if(e.key === "ArrowLeft") keys.ArrowLeft = false; 
+            if(e.key === "ArrowRight") keys.ArrowRight = false; 
+        });
 
         document.getElementById('highVal').innerText = highScore;
 
-        // --- FUNÇÕES PRINCIPAIS ---
+        // --- DESENHAR CARRO "NA MÃO" (Pixel Art via Código) ---
+        // Esta função desenha o carro usando retângulos, sem precisar de imagens externas
+        function desenharCarro(x, y, corPrincipal) {
+            
+            // 1. Pneus (Pretos)
+            ctx.fillStyle = "#111";
+            // Pneu Esq Frente | Pneu Dir Frente
+            ctx.fillRect(x, y + 10, 12, 18); 
+            ctx.fillRect(x + 38, y + 10, 12, 18);
+            // Pneu Esq Trás | Pneu Dir Trás
+            ctx.fillRect(x, y + 52, 12, 18); 
+            ctx.fillRect(x + 38, y + 52, 12, 18);
+
+            // 2. Chassi Principal (Cor do Carro)
+            ctx.fillStyle = corPrincipal;
+            // Bico
+            ctx.fillRect(x + 18, y + 5, 14, 75);
+            // Asa Traseira
+            ctx.fillRect(x + 8, y + 65, 34, 10);
+            // Asa Dianteira
+            ctx.fillRect(x + 8, y + 5, 34, 6);
+            // Laterais (Sidepods)
+            ctx.fillRect(x + 10, y + 30, 8, 30);
+            ctx.fillRect(x + 32, y + 30, 8, 30);
+
+            // 3. Capacete do Piloto (Amarelo)
+            ctx.fillStyle = "#ffff00";
+            ctx.fillRect(x + 22, y + 40, 6, 6);
+        }
+
+        // --- SISTEMA DE JOGO ---
 
         function spawnObstacle() {
             if(!gameRunning) return;
             const x = Math.random() * (canvas.width - 50);
             obstacles.push({ x: x, y: -100, width: 50, height: 80, passed: false });
             
-            // Dificuldade progressiva
-            let frequency = 1000 - (speed * 10);
-            if (frequency < 400) frequency = 400;
+            // Fica mais rápido spawnar conforme o jogo avança
+            let frequency = 1200 - (speed * 15);
+            if (frequency < 500) frequency = 500;
             
             setTimeout(spawnObstacle, frequency);
-        }
-
-        // Função segura para desenhar
-        function drawEntity(img, x, y, w, h, fallbackColor) {
-            // Verifica se a imagem existe E se já carregou (naturalWidth > 0)
-            if (img && img.complete && img.naturalWidth > 0) {
-                ctx.drawImage(img, x, y, w, h);
-            } else {
-                // PLANO B: Desenha um quadrado se a imagem falhar
-                ctx.fillStyle = fallbackColor;
-                ctx.fillRect(x, y, w, h);
-                // Desenha uma borda para ficar bonito
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x, y, w, h);
-            }
         }
 
         function update() {
@@ -156,17 +173,29 @@
             roadOffset += speed;
             if(roadOffset > 80) roadOffset = 0;
             
-            // Grama
-            ctx.fillStyle = "#222"; 
+            // Asfalto
+            ctx.fillStyle = "#333"; 
             ctx.fillRect(0,0, canvas.width, canvas.height);
-            ctx.fillStyle = "#1a441a"; // Faixa verde lateral
+            
+            // Grama e Zebras
+            ctx.fillStyle = "#1a551a"; 
             ctx.fillRect(0,0, 20, canvas.height);
             ctx.fillRect(380,0, 20, canvas.height);
+            
+            // Zebra Vermelha/Branca animada nas laterais
+            let zebraColor = (Math.floor(Date.now() / 100) % 2 === 0) ? "#fff" : "#ff0000";
+            ctx.fillStyle = zebraColor;
+            for(let i=-1; i<12; i++) {
+                 // Faixa Esquerda
+                 ctx.fillRect(15, (i*60) + roadOffset, 5, 30);
+                 // Faixa Direita
+                 ctx.fillRect(380, (i*60) + roadOffset, 5, 30);
+            }
 
-            // Faixas brancas
-            ctx.fillStyle = "rgba(255,255,255,0.2)";
+            // Faixas brancas do meio
+            ctx.fillStyle = "rgba(255,255,255,0.3)";
             for(let i=-1; i<10; i++) {
-                ctx.fillRect(190, (i*80) + roadOffset, 20, 40);
+                ctx.fillRect(195, (i*80) + roadOffset, 10, 40);
             }
 
             // 2. FÍSICA JOGADOR
@@ -175,32 +204,27 @@
             player.vx *= player.friction;
             player.x += player.vx;
 
-            // Colisão com paredes
+            // Limites da parede
             if(player.x < 20) { player.x = 20; player.vx = 0; }
             if(player.x > 330) { player.x = 330; player.vx = 0; }
 
-            // DESENHA JOGADOR (Azul Ciano)
-            drawEntity(playerSprite, player.x, player.y, player.width, player.height, "#00ccff");
+            // DESENHA JOGADOR (Chama a função nova)
+            desenharCarro(player.x, player.y, "#00ccff"); // Azul Ciano
 
             // 3. OBSTÁCULOS
             for (let i = 0; i < obstacles.length; i++) {
                 let obs = obstacles[i];
                 obs.y += speed;
 
-                // DESENHA INIMIGO (Vermelho)
-                // Usamos a mesma imagem do player, mas desenhamos um quadrado vermelho semitransparente por cima
-                drawEntity(playerSprite, obs.x, obs.y, obs.width, obs.height, "#ff4444");
-                
-                // Filtro de cor para o inimigo
-                ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
-                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                // DESENHA INIMIGO
+                desenharCarro(obs.x, obs.y, "#ff4444"); // Vermelho
 
-                // Colisão
+                // Colisão (Hitbox um pouco menor que o carro para ser justo)
                 if (
-                    player.x < obs.x + obs.width - 5 &&
-                    player.x + player.width > obs.x + 5 &&
-                    player.y < obs.y + obs.height - 5 &&
-                    player.y + player.height > obs.y + 5
+                    player.x + 5 < obs.x + obs.width - 5 &&
+                    player.x + player.width - 5 > obs.x + 5 &&
+                    player.y + 5 < obs.y + obs.height - 5 &&
+                    player.y + player.height - 5 > obs.y + 5
                 ) {
                     gameOver();
                 }
@@ -209,8 +233,9 @@
                 if(obs.y > canvas.height && !obs.passed) {
                     obs.passed = true;
                     score++;
-                    speed += 0.1; // Acelera
+                    speed += 0.2; 
                     document.getElementById('scoreVal').innerText = score;
+                    document.getElementById('speedVal').innerText = Math.floor((speed/5)*100);
                 }
             }
 
@@ -237,11 +262,12 @@
             document.getElementById('gameOverScreen').style.display = 'none';
             document.getElementById('scoreVal').innerText = "0";
             document.getElementById('highVal').innerText = highScore;
+            document.getElementById('speedVal').innerText = "100";
             spawnObstacle();
             update();
         }
 
-        // INÍCIO IMEDIATO
+        // Iniciar
         spawnObstacle();
         update();
 
